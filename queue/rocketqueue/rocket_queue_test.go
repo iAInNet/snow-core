@@ -1,35 +1,44 @@
-package alirocketqueue
+package rocketqueue
 
 import (
 	"context"
 	"fmt"
+	"github.com/qit-team/snow-core/log/logger"
 	"io/ioutil"
+	"log"
 	"strings"
 	"testing"
 
-	"github.com/qit-team/snow-core/aliyunmq"
 	"github.com/qit-team/snow-core/config"
 	"github.com/qit-team/snow-core/queue"
+	"github.com/qit-team/snow-core/rocketmq"
 )
 
 var q queue.Queue
 
 func init() {
 	// 需要自己在文件填好配置
-	conf := config.AliyunMqConfig{}
+	conf := config.RocketMqConfig{}
 	conf = getConfig()
-	//注册alimns类
-	err := aliyunmq.Pr.Register("aliyun_mq", conf)
+	//注册rocketmq类
+	err := rocketmq.Pr.Register("rocket_mq", conf)
+	logger.Pr.Register(logger.SingletonMain, config.LogConfig{
+		Handler:  "stdout",
+		Level:    "debug",
+		Segment:  false,
+		Dir:      ".",
+		FileName: "",
+	})
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	q = queue.GetQueue("aliyun_mq", queue.DriverTypeAliyunMq)
+	q = queue.GetQueue("rocket_mq", queue.DriverTypeRocketMq)
 }
 
 func TestEnqueue(t *testing.T) {
-	q := queue.GetQueue("aliyun_mq", queue.DriverTypeAliyunMq)
+	q := queue.GetQueue("rocket_mq", queue.DriverTypeRocketMq)
 	topic := "SNOW-TOPIC-TEST"
 	groupId := "GID-SNOW-TOPIC-TEST"
 	ctx := context.TODO()
@@ -44,8 +53,9 @@ func TestEnqueue(t *testing.T) {
 		return
 	}
 
-	message, token, dequeueCount, err := q.Dequeue(ctx, topic, "", groupId)
+	message, tag, token, dequeueCount, err := q.Dequeue(ctx, topic, "", groupId)
 	fmt.Println("message content:", message)
+	fmt.Println("message tag:", tag)
 	fmt.Println("message dequeue num:", dequeueCount)
 	fmt.Println("message token:", token)
 	if err != nil {
@@ -69,8 +79,9 @@ func TestEnqueue(t *testing.T) {
 		return
 	}
 
-	message, token, dequeueCount, err = q.Dequeue(ctx, topic, "", groupId)
+	message, tag, token, dequeueCount, err = q.Dequeue(ctx, topic, "", groupId)
 	fmt.Println("message content:", message)
+	fmt.Println("message tag:", tag)
 	fmt.Println("message dequeue num:", dequeueCount)
 	fmt.Println("message token:", token)
 	if err != nil {
@@ -101,13 +112,13 @@ func TestBatchEnqueue(t *testing.T) {
 
 	fmt.Println("batch enqueue", topic, messages)
 
-	message1, token1, dequeueCount, err := q.Dequeue(ctx, topic, "", groupId)
+	message1, _, token1, dequeueCount, err := q.Dequeue(ctx, topic, "", groupId)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	message2, token2, dequeueCount, err := q.Dequeue(ctx, topic, "", groupId)
+	message2, _, token2, dequeueCount, err := q.Dequeue(ctx, topic, "", groupId)
 	if err != nil {
 		t.Error(err)
 		return
@@ -172,18 +183,21 @@ func Test_getOption(t *testing.T) {
 	}
 }
 
-func getConfig() config.AliyunMqConfig {
+func getConfig() config.RocketMqConfig {
 	//需要自己在文件填好配置
-	bs, err := ioutil.ReadFile("../../.env.aliyunmq")
+	bs, err := ioutil.ReadFile("../../.env.rocketmq")
 
-	conf := config.AliyunMqConfig{}
+	conf := config.RocketMqConfig{}
 	if err == nil {
 		str := string(bs)
 		arr := strings.Split(str, "\n")
+		log.Print(arr)
 		if len(arr) >= 3 {
 			conf.EndPoint = arr[0]
 			conf.AccessKey = arr[1]
 			conf.SecretKey = arr[2]
+			conf.InstanceId = arr[3]
+			conf.GroupId = arr[4]
 		}
 	}
 	return conf
